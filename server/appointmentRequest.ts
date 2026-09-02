@@ -88,3 +88,29 @@ export class AppointmentSubmissionRateLimiter {
 // Per-process protection for the only public write endpoint. On autoscaling
 // deployments each instance enforces its own short window without persisting IPs.
 export const appointmentSubmissionRateLimiter = new AppointmentSubmissionRateLimiter();
+
+
+export const APPOINTMENT_TIME_PATTERN = /^(0[1-9]|1[0-2]):([0-5][0-9]) (AM|PM)$/;
+
+export function parsePreferredTime(value: string): number {
+  const match = APPOINTMENT_TIME_PATTERN.exec(value.trim());
+  if (!match) throw new Error("Gunakan format jam XX:YY AM|PM.");
+  const hour = Number(match[1]) % 12;
+  const minute = Number(match[2]);
+  return hour * 60 + minute + (match[3] === "PM" ? 720 : 0);
+}
+
+export function formatPreferredTime(totalMinutes: number): string {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const period = normalized >= 720 ? "PM" : "AM";
+  const hour = Math.floor((normalized % 720) / 60) || 12;
+  const minute = normalized % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+export function allocateAppointmentTime(preferredTime: string, existingAssignedTimes: string[]): string {
+  let candidateMinutes = parsePreferredTime(preferredTime);
+  const occupied = new Set(existingAssignedTimes.map(parsePreferredTime));
+  while (occupied.has(candidateMinutes % 1440)) candidateMinutes = (candidateMinutes + 30) % 1440;
+  return formatPreferredTime(candidateMinutes);
+}

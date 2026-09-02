@@ -1,4 +1,4 @@
-import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -75,12 +75,18 @@ export const appointmentRequests = mysqlTable("appointment_requests", {
   contactNumber: varchar("contactNumber", { length: 40 }).notNull(),
   service: varchar("service", { length: 160 }).notNull(),
   preferredDate: varchar("preferredDate", { length: 10 }).notNull(),
+  preferredTime: varchar("preferredTime", { length: 16 }).notNull().default("09:00 AM"),
+  assignedTime: varchar("assignedTime", { length: 16 }).notNull().default("09:00 AM"),
+  queueNumber: int("queueNumber").notNull().default(1),
   note: varchar("note", { length: 600 }),
   consentedAt: timestamp("consentedAt").defaultNow().notNull(),
   status: mysqlEnum("status", ["new", "contacted", "closed"]).default("new").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => ({
+  dailyQueueUnique: uniqueIndex("appointment_requests_date_queue_unique").on(table.preferredDate, table.queueNumber),
+  dailyTimeUnique: uniqueIndex("appointment_requests_date_time_unique").on(table.preferredDate, table.assignedTime),
+}));
 
 export const whatsappFollowUpActivities = mysqlTable("whatsapp_follow_up_activities", {
   id: int("id").autoincrement().primaryKey(),

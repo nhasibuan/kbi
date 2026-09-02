@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
   AppointmentSubmissionRateLimiter,
+  allocateAppointmentTime,
+  formatPreferredTime,
   getClientIp,
+  parsePreferredTime,
   isAutomatedAppointmentRequest,
   normalizeAppointmentNote,
 } from "./appointmentRequest";
 
 describe("appointment request privacy helpers", () => {
+  it("parses and formats the localized 12-hour appointment time", () => {
+    expect(parsePreferredTime("12:00 AM")).toBe(0);
+    expect(parsePreferredTime("09:30 AM")).toBe(570);
+    expect(parsePreferredTime("12:15 PM")).toBe(735);
+    expect(formatPreferredTime(0)).toBe("12:00 AM");
+    expect(formatPreferredTime(735)).toBe("12:15 PM");
+    expect(() => parsePreferredTime("13:00 PM")).toThrow("XX:YY AM|PM");
+  });
+
+  it("moves later requests by 30 minutes for each occupied time", () => {
+    expect(allocateAppointmentTime("09:00 AM", [])).toBe("09:00 AM");
+    expect(allocateAppointmentTime("09:00 AM", ["09:00 AM"])).toBe("09:30 AM");
+    expect(allocateAppointmentTime("09:00 AM", ["09:00 AM", "09:30 AM"])).toBe("10:00 AM");
+    expect(allocateAppointmentTime("11:30 PM", ["11:30 PM", "12:00 AM"])).toBe("12:30 AM");
+  });
+
   it("normalizes optional scheduling notes without retaining blank data", () => {
     expect(normalizeAppointmentNote("  Mohon   konfirmasi  jadwal. ")).toBe("Mohon konfirmasi jadwal.");
     expect(normalizeAppointmentNote("   ")).toBeNull();

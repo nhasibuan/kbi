@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   appointmentRequests,
@@ -11,6 +11,7 @@ import {
   whatsappSignatureTemplates,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { allocateAppointmentTime } from "./appointmentRequest";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -36,6 +37,7 @@ export type AppointmentRequestInput = {
   contactNumber: string;
   service: string;
   preferredDate: string;
+  preferredTime: string;
   note?: string | null;
 };
 
@@ -171,12 +173,36 @@ export async function createMediaAsset(input: {
 
 export async function createAppointmentRequest(input: AppointmentRequestInput) {
   const db = requireDb(await getDb());
-  const inserted = await db.insert(appointmentRequests).values({
-    ...input,
-    note: input.note ?? null,
-    consentedAt: new Date(),
+  const lockName = `kbi-appointment-${input.preferredDate}`;
+
+  return db.transaction(async tx => {
+    const lockResult = await tx.execute(sql`SELECT GET_LOCK(${lockName}, 10) AS acquired`);
+    const acquired = Number((lockResult as any)[0]?.acquired ?? (lockResult as any)[0]?.[0]?.acquired ?? 0);
+    if (acquired !== 1) throw new Error("Sistem penjadwalan sedang sibuk. Silakan coba lagi.");
+
+    try {
+      const existing = await tx
+        .select({ assignedTime: appointmentRequests.assignedTime })
+        .from(appointmentRequests)
+        .where(eq(appointmentRequests.preferredDate, input.preferredDate));
+      const queueRows = await tx
+        .select({ id: appointmentRequests.id })
+        .from(appointmentRequests)
+        .where(eq(appointmentRequests.preferredDate, input.preferredDate));
+      const assignedTime = allocateAppointmentTime(input.preferredTime, existing.map(row => row.assignedTime));
+      const queueNumber = queueRows.length + 1;
+      const inserted = await tx.insert(appointmentRequests).values({
+        ...input,
+        assignedTime,
+        queueNumber,
+        note: input.note ?? null,
+        consentedAt: new Date(),
+      });
+      return { id: Number(inserted[0].insertId), preferredTime: input.preferredTime, assignedTime, queueNumber };
+    } finally {
+      await tx.execute(sql`SELECT RELEASE_LOCK(${lockName})`);
+    }
   });
-  return { id: Number(inserted[0].insertId) };
 }
 
 export async function getAppointmentRequests() {

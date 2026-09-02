@@ -28,6 +28,7 @@ const input = {
   contactNumber: "+6285215862526",
   service: "Poli Umum",
   preferredDate: "2026-08-26",
+  preferredTime: "09:00 AM",
   consent: true as const,
 };
 
@@ -43,7 +44,7 @@ describe("appointment create rate limiting", () => {
   beforeEach(() => {
     appointmentSubmissionRateLimiter.reset();
     dbMocks.createAppointmentRequest.mockReset();
-    dbMocks.createAppointmentRequest.mockResolvedValue({ id: 150001 });
+    dbMocks.createAppointmentRequest.mockResolvedValue({ id: 150001, queueNumber: 1, preferredTime: "09:00 AM", assignedTime: "09:00 AM" });
     turnstileMocks.verifyTurnstileToken.mockReset();
     turnstileMocks.verifyTurnstileToken.mockResolvedValue({ success: true, errorCodes: [] });
   });
@@ -67,6 +68,8 @@ describe("appointment create rate limiting", () => {
     await expect(caller.appointments.create({ ...input, captchaToken: "verified-token" })).resolves.toEqual({
       success: true,
       requestId: 150001,
+      queueNumber: 1,
+      assignedTime: "09:00 AM",
     });
     expect(turnstileMocks.verifyTurnstileToken).toHaveBeenCalledWith("verified-token", "203.0.113.88", "test-secret");
 

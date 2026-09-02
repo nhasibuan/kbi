@@ -278,3 +278,25 @@
 - [x] Run regression checks and publish the verified link-removal revision.
 
 - [x] Confirm live DOM: zero “Lihat alur kunjungan” anchors remain and seven Ajukan kunjungan buttons are still present across the page.
+
+## Repository recovery completion
+
+- [x] Mirror the non-empty `nhasibuan/primecare-clinic-reimagined` repository into `nhasibuan/kbi`.
+- [x] Reconnect `/home/ubuntu/primecare-clinic-reimagined` to the `user_github` remote at `https://github.com/nhasibuan/kbi.git`.
+- [x] Preserve the former partial workspace in `/home/ubuntu/primecare-clinic-reimagined.partial-recovery-20260901-225400`.
+- [x] Install dependencies and verify the restored development server.
+
+## Development server recovery
+
+- [x] Restart the development server after it stopped responding.
+- [x] Verify the server health and preview availability.
+
+## Automatic queue numbering and preferred appointment time
+
+- [x] Inspect the restored appointment schema, router, public form, confirmation UI, and admin queue workflow.
+- [x] Add persisted preferred-time, assigned-time, and daily queue-number fields without storing medical data.
+- [x] Implement validated `XX:YY AM|PM` parsing and collision allocation with 30-minute delays.
+- [x] Update the public form and confirmation UI with `Jam pilihan`, `Nomor antrian`, and `Jam layanan` in Bahasa Indonesia.
+- [x] Update the protected admin queue display with assigned queue and service times.
+- [x] Add unit coverage for parsing, daily numbering, collisions, and normal appointment behavior.
+- [x] Run tests, type checks, production build, and responsive verification.

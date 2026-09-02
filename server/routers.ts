@@ -50,6 +50,7 @@ const appointmentInput = z.object({
   contactNumber: z.string().trim().min(8).max(40).regex(/^[0-9+()\-\s]+$/, "Use a valid phone or WhatsApp number."),
   service: z.string().trim().min(2).max(160),
   preferredDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid preferred date."),
+  preferredTime: z.string().regex(/^(0[1-9]|1[0-2]):[0-5][0-9] (AM|PM)$/, "Gunakan format jam XX:YY AM|PM."),
   note: z.string().trim().max(600).optional(),
   consent: z.literal(true),
   website: z.string().max(255).optional(),
@@ -105,9 +106,10 @@ export const appRouter = router({
         contactNumber: input.contactNumber,
         service: input.service,
         preferredDate: input.preferredDate,
+        preferredTime: input.preferredTime,
         note: normalizeAppointmentNote(input.note),
       });
-      return { success: true, requestId: request.id } as const;
+      return { success: true, requestId: request.id, queueNumber: request.queueNumber, assignedTime: request.assignedTime } as const;
     }),
     list: adminProcedure.query(() => getAppointmentRequests()),
     updateStatus: adminProcedure

@@ -22,6 +22,7 @@ const initialForm = {
   contactNumber: "",
   service: "",
   preferredDate: "",
+  preferredTime: "09:00 AM",
   note: "",
   consent: false,
   website: "",
@@ -99,15 +100,18 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
   const [requiresCaptcha, setRequiresCaptcha] = useState(() => import.meta.env.DEV && new URLSearchParams(window.location.search).get("captchaFallback") === "1");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaVersion, setCaptchaVersion] = useState(0);
+  const [confirmation, setConfirmation] = useState<{ queueNumber: number; assignedTime: string } | null>(null);
   const captchaPanelRef = useRef<HTMLDivElement>(null);
   const fallbackQaHasRunRef = useRef(false);
   const createRequest = trpc.appointments.create.useMutation({
-    onSuccess: () => {
+    onSuccess: result => {
       setForm(initialForm);
+      if (result.queueNumber !== undefined && result.assignedTime !== undefined) {
+        setConfirmation({ queueNumber: result.queueNumber, assignedTime: result.assignedTime });
+      }
       setRequiresCaptcha(false);
       setCaptchaToken("");
       if (isDevelopmentFallbackQa) return;
-      onOpenChange(false);
       toast.success("Permintaan kunjungan sudah dikirim.", {
         description: "Staf klinik akan menghubungi Anda untuk mengonfirmasi ketersediaan.",
       });
@@ -138,6 +142,7 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
       contactNumber: "+6285215862526",
       service: "Poli Umum",
       preferredDate: "2026-08-26",
+      preferredTime: "09:00 AM",
       consent: true as const,
       note: "",
       website: "",
@@ -180,7 +185,12 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-8">
-          <div className="grid gap-5 sm:grid-cols-2">
+          {confirmation ? <div className="rounded-2xl border border-[#039CB7]/25 bg-[#eef8f8] p-5" role="status">
+            <p className="text-sm font-bold uppercase tracking-[.12em] text-[#007f98]">Permintaan diterima</p>
+            <h3 className="mt-2 font-display text-2xl font-semibold text-[#173047]">Nomor antrian Anda: {confirmation.queueNumber}</h3>
+            <p className="mt-2 text-sm leading-6 text-[#395568]">Jam layanan yang dialokasikan sistem: <strong>{confirmation.assignedTime}</strong>. Staf klinik akan menghubungi Anda untuk mengonfirmasi ketersediaan.</p>
+            <button type="button" onClick={() => { setConfirmation(null); onOpenChange(false); }} className="mt-5 inline-flex rounded-full bg-[#039CB7] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#007f98]">Selesai</button>
+          </div> : <div className="grid gap-5 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Nama lengkap
               <input required value={form.fullName} onChange={e => setForm(current => ({ ...current, fullName: e.target.value }))} autoComplete="name" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
             </label>
@@ -196,33 +206,37 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Tanggal pilihan
               <input required type="date" min={today} value={form.preferredDate} onChange={e => setForm(current => ({ ...current, preferredDate: e.target.value }))} className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
             </label>
-          </div>
+            <label className="grid gap-2 text-sm font-bold text-[#395568]">Jam pilihan
+              <input required type="text" inputMode="numeric" pattern="(0[1-9]|1[0-2]):[0-5][0-9] (AM|PM)" placeholder="09:30 AM" value={form.preferredTime} onChange={e => setForm(current => ({ ...current, preferredTime: e.target.value.toUpperCase() }))} aria-describedby="preferred-time-help" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+              <span id="preferred-time-help" className="text-xs font-normal text-[#607684]">Gunakan format XX:YY AM|PM, contoh 09:30 AM.</span>
+            </label>
+          </div>}
 
-          <label className="grid gap-2 text-sm font-bold text-[#395568]">Catatan untuk penjadwalan <span className="font-normal text-[#607684]">(opsional)</span>
+          {!confirmation && <label className="grid gap-2 text-sm font-bold text-[#395568]">Catatan untuk penjadwalan <span className="font-normal text-[#607684]">(opsional)</span>
             <textarea value={form.note} onChange={e => setForm(current => ({ ...current, note: e.target.value }))} maxLength={600} rows={3} placeholder="Contoh: lebih mudah dihubungi pada sore hari. Jangan sertakan diagnosis atau hasil pemeriksaan." className="resize-none rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm leading-6 text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
-          </label>
+          </label>}
 
-          <div className="absolute left-[-10000px] h-px w-px overflow-hidden" aria-hidden="true">
+          {!confirmation && <div className="absolute left-[-10000px] h-px w-px overflow-hidden" aria-hidden="true">
             <label>Website<input tabIndex={-1} autoComplete="off" value={form.website} onChange={e => setForm(current => ({ ...current, website: e.target.value }))} /></label>
-          </div>
+          </div>}
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#eef8f8] p-4 text-sm leading-6 text-[#395568]">
+          {!confirmation && <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#eef8f8] p-4 text-sm leading-6 text-[#395568]">
             <input required type="checkbox" checked={form.consent} onChange={e => setForm(current => ({ ...current, consent: e.target.checked }))} className="mt-1 h-4 w-4 accent-[#039CB7]" />
             <span>Saya setuju Klinik Berkat Insani menggunakan data di atas untuk menanggapi pengajuan kunjungan. Saya memahami bahwa pengajuan tersebut bukan konfirmasi jadwal.</span>
-          </label>
+          </label>}
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"><ShieldCheck className="mr-2 inline-block h-4 w-4 align-text-bottom" />Untuk keadaan darurat, hubungi layanan darurat setempat atau fasilitas kesehatan terdekat. Jangan gunakan formulir untuk kondisi yang membutuhkan pertolongan segera.</div>
+          {!confirmation && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"><ShieldCheck className="mr-2 inline-block h-4 w-4 align-text-bottom" />Untuk keadaan darurat, hubungi layanan darurat setempat atau fasilitas kesehatan terdekat. Jangan gunakan formulir untuk kondisi yang membutuhkan pertolongan segera.          </div>}
 
-          {requiresCaptcha && <div ref={captchaPanelRef} className="rounded-2xl border border-[#039CB7]/25 bg-[#eef8f8] p-4" role="status">
+          {!confirmation && requiresCaptcha && <div ref={captchaPanelRef} className="rounded-2xl border border-[#039CB7]/25 bg-[#eef8f8] p-4" role="status">
             <p className="mb-3 text-sm font-bold text-[#173047]">Verifikasi keamanan diperlukan</p>
             <p className="mb-4 text-sm leading-6 text-[#395568]">Untuk melindungi formulir dari pengiriman berulang, selesaikan verifikasi singkat ini. Token verifikasi tidak disimpan bersama permintaan kunjungan.</p>
             <AppointmentCaptcha key={captchaVersion} onTokenChange={handleCaptchaToken} />
           </div>}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {!confirmation && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-[#007f98] transition hover:text-[#039CB7]"><MessageCircle size={16} /> Gunakan WhatsApp sebagai alternatif</a>
             <button type="submit" disabled={createRequest.isPending || !form.consent || (requiresCaptcha && !captchaToken)} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#039CB7] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#007f98] disabled:cursor-not-allowed disabled:opacity-60">{createRequest.isPending ? "Mengirim..." : "Kirim permintaan"}</button>
-          </div>
+          </div>}
         </form>
       </DialogContent>
     </Dialog>
