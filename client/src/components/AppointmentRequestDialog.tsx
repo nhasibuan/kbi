@@ -40,6 +40,7 @@ declare global {
 }
 
 const TURNSTILE_SCRIPT_ID = "cloudflare-turnstile-api";
+const HOUR_MINUTE_PATTERN = /^(0[1-9]|1[0-2]):[0-5][0-9]$/;
 const TURNSTILE_ALWAYS_PASS_TEST_SITE_KEY = "1x00000000000000000000AA";
 
 function AppointmentCaptcha({ onTokenChange }: { onTokenChange: (token: string) => void }) {
@@ -97,6 +98,8 @@ function AppointmentCaptcha({ onTokenChange }: { onTokenChange: (token: string) 
 export default function AppointmentRequestDialog({ open, onOpenChange, services, whatsappUrl }: AppointmentRequestDialogProps) {
   const isDevelopmentFallbackQa = import.meta.env.DEV && new URLSearchParams(window.location.search).get("captchaQaE2E") === "1";
   const [form, setForm] = useState(initialForm);
+  const [preferredTimeInput, setPreferredTimeInput] = useState("09:00");
+  const [preferredPeriod, setPreferredPeriod] = useState<"AM" | "PM">("AM");
   const [requiresCaptcha, setRequiresCaptcha] = useState(() => import.meta.env.DEV && new URLSearchParams(window.location.search).get("captchaFallback") === "1");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaVersion, setCaptchaVersion] = useState(0);
@@ -106,6 +109,8 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
   const createRequest = trpc.appointments.create.useMutation({
     onSuccess: result => {
       setForm(initialForm);
+      setPreferredTimeInput("09:00");
+      setPreferredPeriod("AM");
       if (result.queueNumber !== undefined && result.assignedTime !== undefined) {
         setConfirmation({ queueNumber: result.queueNumber, assignedTime: result.assignedTime });
       }
@@ -168,7 +173,11 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    createRequest.mutate({ ...form, consent: true, captchaToken: requiresCaptcha ? captchaToken || undefined : undefined });
+    if (!HOUR_MINUTE_PATTERN.test(preferredTimeInput)) {
+      toast.error("Jam pilihan harus menggunakan format XX:YY, contoh 09:30.");
+      return;
+    }
+    createRequest.mutate({ ...form, preferredTime: `${preferredTimeInput} ${preferredPeriod}`, consent: true, captchaToken: requiresCaptcha ? captchaToken || undefined : undefined });
   };
 
   const today = new Date().toISOString().slice(0, 10);
@@ -191,6 +200,10 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
             <p className="mt-2 text-sm leading-6 text-[#395568]">Jam layanan yang dialokasikan sistem: <strong>{confirmation.assignedTime}</strong>. Staf klinik akan menghubungi Anda untuk mengonfirmasi ketersediaan.</p>
             <button type="button" onClick={() => { setConfirmation(null); onOpenChange(false); }} className="mt-5 inline-flex rounded-full bg-[#039CB7] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#007f98]">Selesai</button>
           </div> : <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-2 rounded-xl border border-dashed border-[#039CB7]/40 bg-[#f5fafb] px-4 py-3 text-sm text-[#395568] sm:col-span-2">
+              <span className="font-bold">Nomor antrian</span>
+              <span className="text-xs leading-5 text-[#607684]">Diisi otomatis oleh sistem setelah permintaan berhasil dikirim.</span>
+            </div>
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Nama lengkap
               <input required value={form.fullName} onChange={e => setForm(current => ({ ...current, fullName: e.target.value }))} autoComplete="name" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
             </label>
@@ -207,8 +220,11 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
               <input required type="date" min={today} value={form.preferredDate} onChange={e => setForm(current => ({ ...current, preferredDate: e.target.value }))} className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
             </label>
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Jam pilihan
-              <input required type="text" inputMode="numeric" pattern="(0[1-9]|1[0-2]):[0-5][0-9] (AM|PM)" placeholder="09:30 AM" value={form.preferredTime} onChange={e => setForm(current => ({ ...current, preferredTime: e.target.value.toUpperCase() }))} aria-describedby="preferred-time-help" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
-              <span id="preferred-time-help" className="text-xs font-normal text-[#607684]">Gunakan format XX:YY AM|PM, contoh 09:30 AM.</span>
+              <div className="flex gap-2">
+                <input required type="text" inputMode="numeric" pattern="(0[1-9]|1[0-2]):[0-5][0-9]" maxLength={5} placeholder="09:30" value={preferredTimeInput} onChange={event => setPreferredTimeInput(event.target.value.replace(/[^0-9:]/g, "").slice(0, 5))} aria-describedby="preferred-time-help" className="min-w-0 flex-1 rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+                <select required value={preferredPeriod} onChange={event => setPreferredPeriod(event.target.value as "AM" | "PM")} aria-label="Periode jam pilihan" className="w-24 rounded-xl border border-[#173047]/15 bg-white px-3 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10"><option value="AM">AM</option><option value="PM">PM</option></select>
+              </div>
+              <span id="preferred-time-help" className="text-xs font-normal text-[#607684]">Masukkan jam dan menit dengan format XX:YY, lalu pilih AM atau PM.</span>
             </label>
           </div>}
 
@@ -235,7 +251,7 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
 
           {!confirmation && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-[#007f98] transition hover:text-[#039CB7]"><MessageCircle size={16} /> Gunakan WhatsApp sebagai alternatif</a>
-            <button type="submit" disabled={createRequest.isPending || !form.consent || (requiresCaptcha && !captchaToken)} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#039CB7] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#007f98] disabled:cursor-not-allowed disabled:opacity-60">{createRequest.isPending ? "Mengirim..." : "Kirim permintaan"}</button>
+            <button type="submit" disabled={createRequest.isPending || !form.consent || !HOUR_MINUTE_PATTERN.test(preferredTimeInput) || (requiresCaptcha && !captchaToken)} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#039CB7] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#007f98] disabled:cursor-not-allowed disabled:opacity-60">{createRequest.isPending ? "Mengirim..." : "Kirim permintaan"}</button>
           </div>}
         </form>
       </DialogContent>

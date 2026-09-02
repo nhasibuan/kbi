@@ -1,0 +1,3 @@
+# Appointment form refinement verification
+
+The public landing page was captured at 1280px desktop width and 375px mobile width after the form refinement. The Klinik Berkat Insani logo, navigation, hero content, and appointment entry points remain visible without observed overflow or layout breakage. The refined dialog now presents the automatic queue-number explanation before the full-name field, uses a separate `XX:YY` hour-minute input, and provides an independent AM/PM select control. Direct dialog field interaction was not available in the screenshot-only verification path, so the strict behavior is covered by the client handler and backend schema validation.

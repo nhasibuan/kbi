@@ -300,3 +300,10 @@
 - [x] Update the protected admin queue display with assigned queue and service times.
 - [x] Add unit coverage for parsing, daily numbering, collisions, and normal appointment behavior.
 - [x] Run tests, type checks, production build, and responsive verification.
+
+## Appointment form refinement
+
+- [x] Display the assigned `Nomor antrian` before `Nama lengkap` in the appointment form flow.
+- [x] Validate the hour and minute text input strictly as `XX:YY`.
+- [x] Move `AM|PM` into a separate select control and combine it safely for backend submission.
+- [x] Update tests, responsive verification, and save the refined checkpoint.
