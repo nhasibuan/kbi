@@ -322,3 +322,9 @@
 - [x] Add an accessible Save Image action for the confirmation object.
 - [x] Add a WhatsApp button that opens the clinic staff/admin number with the confirmation summary.
 - [x] Add tests and responsive verification, then save the updated checkpoint.
+
+## Consolidated confirmation action
+
+- [x] Make the `Selesai` button save the confirmation image and open WhatsApp staff with the summary.
+- [x] Delete the separate `Kirim ke WhatsApp staf` button.
+- [x] Verify the consolidated action, run tests/build, and save the updated checkpoint.

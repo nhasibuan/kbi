@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { CalendarDays, Download, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { CalendarDays, MessageCircle, ShieldCheck } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -219,6 +219,13 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
     window.open(`${whatsappUrl}${separator}text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   };
 
+  const finishConfirmation = () => {
+    saveConfirmationImage();
+    sendConfirmationToWhatsApp();
+    setConfirmation(null);
+    onOpenChange(false);
+  };
+
   useEffect(() => {
     if (!open || !isDevelopmentFallbackQa || fallbackQaHasRunRef.current) return;
     fallbackQaHasRunRef.current = true;
@@ -300,9 +307,7 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
             </div>
             <p className="mt-4 text-sm leading-6 text-[#395568]">Staf klinik akan menghubungi Anda untuk mengonfirmasi ketersediaan.</p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <button type="button" onClick={saveConfirmationImage} className="inline-flex items-center justify-center gap-2 rounded-full border border-[#039CB7]/30 bg-white px-4 py-3 text-sm font-bold text-[#007f98] transition hover:bg-[#eaf9fb]"><Download size={16} /> Simpan gambar</button>
-              <button type="button" onClick={sendConfirmationToWhatsApp} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1da851]"><Send size={16} /> Kirim ke WhatsApp staf</button>
-              <button type="button" onClick={() => { setConfirmation(null); onOpenChange(false); }} className="inline-flex items-center justify-center rounded-full bg-[#039CB7] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#007f98]">Selesai</button>
+              <button type="button" onClick={finishConfirmation} className="inline-flex items-center justify-center rounded-full bg-[#039CB7] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#007f98]">Selesai</button>
             </div>
           </div> : <div className="grid gap-5 sm:grid-cols-2">
             <div className="grid gap-2 rounded-xl border border-dashed border-[#039CB7]/40 bg-[#f5fafb] px-4 py-3 text-sm text-[#395568] sm:col-span-2">
