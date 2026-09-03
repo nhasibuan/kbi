@@ -307,3 +307,11 @@
 - [x] Validate the hour and minute text input strictly as `XX:YY`.
 - [x] Move `AM|PM` into a separate select control and combine it safely for backend submission.
 - [x] Update tests, responsive verification, and save the refined checkpoint.
+
+## Service-specific appointment validation and content update
+
+- [x] Show `Nomor antrian` at the start of the appointment form rather than only after submission.
+- [x] Validate `Jam pilihan` against each poli's weekday-specific WITA service hours.
+- [x] Add the supplied doctors, service days, hours, and by-appointment notes to the persisted clinic service content.
+- [x] Update appointment service choices and explanatory UI to use the refreshed service information.
+- [x] Add unit tests for service-hour validation and run full verification before checkpoint.

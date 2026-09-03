@@ -3,8 +3,10 @@ import {
   AppointmentSubmissionRateLimiter,
   allocateAppointmentTime,
   formatPreferredTime,
+  getServiceHourWindow,
   getClientIp,
   parsePreferredTime,
+  validatePreferredServiceTime,
   isAutomatedAppointmentRequest,
   normalizeAppointmentNote,
 } from "./appointmentRequest";
@@ -24,6 +26,16 @@ describe("appointment request privacy helpers", () => {
     expect(allocateAppointmentTime("09:00 AM", ["09:00 AM"])).toBe("09:30 AM");
     expect(allocateAppointmentTime("09:00 AM", ["09:00 AM", "09:30 AM"])).toBe("10:00 AM");
     expect(allocateAppointmentTime("11:30 PM", ["11:30 PM", "12:00 AM"])).toBe("12:30 AM");
+  });
+
+  it("validates each poli against its supplied weekday service hours", () => {
+    expect(validatePreferredServiceTime("Poli Umum", "2026-09-06", "04:00 PM").valid).toBe(true);
+    expect(validatePreferredServiceTime("Poli Umum", "2026-09-06", "09:00 AM").valid).toBe(false);
+    expect(validatePreferredServiceTime("Poli Kandungan", "2026-09-06", "11:00 AM").valid).toBe(true);
+    expect(validatePreferredServiceTime("Poli Kandungan", "2026-09-07", "04:00 PM").valid).toBe(false);
+    expect(validatePreferredServiceTime("Poli Gigi", "2026-09-06", "04:30 PM").valid).toBe(true);
+    expect(validatePreferredServiceTime("Poli Penyakit Dalam", "2026-09-03", "09:00 AM").valid).toBe(true);
+    expect(getServiceHourWindow("Poli Bedah", "2026-09-03")).toMatchObject({ start: 540, end: 1260, byAppointment: true });
   });
 
   it("normalizes optional scheduling notes without retaining blank data", () => {

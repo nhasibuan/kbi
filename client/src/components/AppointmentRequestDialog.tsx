@@ -41,6 +41,32 @@ declare global {
 
 const TURNSTILE_SCRIPT_ID = "cloudflare-turnstile-api";
 const HOUR_MINUTE_PATTERN = /^(0[1-9]|1[0-2]):[0-5][0-9]$/;
+const SERVICE_WINDOWS: Record<string, Partial<Record<number, { start: number; end: number; byAppointment?: boolean }>>> = {
+  "Poli Umum": { 0: { start: 16 * 60, end: 21 * 60 }, 1: { start: 9 * 60, end: 21 * 60 }, 2: { start: 9 * 60, end: 21 * 60 }, 3: { start: 9 * 60, end: 21 * 60 }, 4: { start: 9 * 60, end: 21 * 60 }, 5: { start: 9 * 60, end: 21 * 60 }, 6: { start: 9 * 60, end: 21 * 60 } },
+  "Poli Kandungan": { 0: { start: 11 * 60, end: 21 * 60, byAppointment: true }, 1: { start: 17 * 60, end: 21 * 60, byAppointment: true } },
+  "Poli Gigi": { 0: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true }, 1: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true }, 2: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true }, 3: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true }, 4: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true }, 5: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true } },
+  "Poli Penyakit Dalam": Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { start: 9 * 60, end: 21 * 60, byAppointment: true }])),
+  "Poli Bedah": Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { start: 9 * 60, end: 21 * 60, byAppointment: true }])),
+};
+
+function toMinutes(time: string) {
+  const [clock, period] = time.split(" ");
+  const [hour, minute] = clock.split(":").map(Number);
+  return (hour % 12) * 60 + minute + (period === "PM" ? 720 : 0);
+}
+
+function getClientServiceWindow(service: string, date: string) {
+  const day = new Date(`${date}T12:00:00+08:00`).getDay();
+  return SERVICE_WINDOWS[service]?.[day] ?? null;
+}
+
+function formatDisplayTime(totalMinutes: number) {
+  const normalized = totalMinutes % 1440;
+  const period = normalized >= 720 ? "PM" : "AM";
+  const hour = Math.floor((normalized % 720) / 60) || 12;
+  const minute = normalized % 60;
+  return `${String(hour).padStart(2, "0")}.${String(minute).padStart(2, "0")} ${period}`;
+}
 const TURNSTILE_ALWAYS_PASS_TEST_SITE_KEY = "1x00000000000000000000AA";
 
 function AppointmentCaptcha({ onTokenChange }: { onTokenChange: (token: string) => void }) {
@@ -177,10 +203,21 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
       toast.error("Jam pilihan harus menggunakan format XX:YY, contoh 09:30.");
       return;
     }
+    const combinedTime = `${preferredTimeInput} ${preferredPeriod}`;
+    const window = getClientServiceWindow(form.service, form.preferredDate);
+    if (window && (toMinutes(combinedTime) < window.start || toMinutes(combinedTime) > window.end)) {
+      toast.error(`Jam layanan ${form.service} adalah ${formatDisplayTime(window.start)}–${formatDisplayTime(window.end)} WITA${window.byAppointment ? " sesuai perjanjian" : ""}.`);
+      return;
+    }
+    if (SERVICE_WINDOWS[form.service] && !window) {
+      toast.error(`${form.service} tidak memiliki jadwal layanan pada hari tersebut.`);
+      return;
+    }
     createRequest.mutate({ ...form, preferredTime: `${preferredTimeInput} ${preferredPeriod}`, consent: true, captchaToken: requiresCaptcha ? captchaToken || undefined : undefined });
   };
 
   const today = new Date().toISOString().slice(0, 10);
+  const selectedWindow = getClientServiceWindow(form.service, form.preferredDate);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -225,6 +262,7 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
                 <select required value={preferredPeriod} onChange={event => setPreferredPeriod(event.target.value as "AM" | "PM")} aria-label="Periode jam pilihan" className="w-24 rounded-xl border border-[#173047]/15 bg-white px-3 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10"><option value="AM">AM</option><option value="PM">PM</option></select>
               </div>
               <span id="preferred-time-help" className="text-xs font-normal text-[#607684]">Masukkan jam dan menit dengan format XX:YY, lalu pilih AM atau PM.</span>
+              {selectedWindow ? <span className="text-xs font-semibold text-[#007f98]">Jam layanan poli ini: {formatDisplayTime(selectedWindow.start)}–{formatDisplayTime(selectedWindow.end)} WITA{selectedWindow.byAppointment ? " (sesuai perjanjian)" : ""}.</span> : form.service && SERVICE_WINDOWS[form.service] && form.preferredDate ? <span className="text-xs font-semibold text-amber-700">Poli ini tidak memiliki jadwal pada tanggal yang dipilih.</span> : null}
             </label>
           </div>}
 

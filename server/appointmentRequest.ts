@@ -114,3 +114,50 @@ export function allocateAppointmentTime(preferredTime: string, existingAssignedT
   while (occupied.has(candidateMinutes % 1440)) candidateMinutes = (candidateMinutes + 30) % 1440;
   return formatPreferredTime(candidateMinutes);
 }
+
+
+export type ServiceHourWindow = { start: number; end: number; byAppointment?: boolean };
+
+const SERVICE_HOUR_RULES: Record<string, Partial<Record<number, ServiceHourWindow>>> = {
+  "Poli Umum": {
+    0: { start: 16 * 60, end: 21 * 60 },
+    1: { start: 9 * 60, end: 21 * 60 },
+    2: { start: 9 * 60, end: 21 * 60 },
+    3: { start: 9 * 60, end: 21 * 60 },
+    4: { start: 9 * 60, end: 21 * 60 },
+    5: { start: 9 * 60, end: 21 * 60 },
+    6: { start: 9 * 60, end: 21 * 60 },
+  },
+  "Poli Kandungan": {
+    0: { start: 11 * 60, end: 21 * 60, byAppointment: true },
+    1: { start: 17 * 60, end: 21 * 60, byAppointment: true },
+  },
+  "Poli Gigi": {
+    0: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true },
+    1: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true },
+    2: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true },
+    3: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true },
+    4: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true },
+    5: { start: 16 * 60 + 30, end: 21 * 60, byAppointment: true },
+  },
+  "Poli Penyakit Dalam": Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { start: 9 * 60, end: 21 * 60, byAppointment: true }])),
+  "Poli Bedah": Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { start: 9 * 60, end: 21 * 60, byAppointment: true }])),
+};
+
+export function getServiceHourWindow(service: string, preferredDate: string): ServiceHourWindow | null {
+  const dayOfWeek = new Date(`${preferredDate}T12:00:00+08:00`).getDay();
+  return SERVICE_HOUR_RULES[service]?.[dayOfWeek] ?? null;
+}
+
+export function validatePreferredServiceTime(service: string, preferredDate: string, preferredTime: string): { valid: true; window: ServiceHourWindow | null } | { valid: false; message: string } {
+  const minutes = parsePreferredTime(preferredTime);
+  const window = getServiceHourWindow(service, preferredDate);
+  if (!window) {
+    if (SERVICE_HOUR_RULES[service]) return { valid: false, message: `${service} tidak memiliki jadwal layanan pada hari tersebut.` };
+    return { valid: true, window: null };
+  }
+  if (minutes < window.start || minutes > window.end) {
+    return { valid: false, message: `${service} melayani pada ${formatPreferredTime(window.start)}–${formatPreferredTime(window.end)} WITA${window.byAppointment ? " sesuai perjanjian" : ""}.` };
+  }
+  return { valid: true, window };
+}
