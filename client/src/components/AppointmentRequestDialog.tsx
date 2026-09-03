@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { CalendarDays, MessageCircle, ShieldCheck } from "lucide-react";
+import { CalendarDays, Download, MessageCircle, Send, ShieldCheck } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -26,6 +26,15 @@ const initialForm = {
   note: "",
   consent: false,
   website: "",
+};
+
+type ConfirmationDetails = {
+  queueNumber: number;
+  assignedTime: string;
+  preferredDate: string;
+  fullName: string;
+  contactNumber: string;
+  service: string;
 };
 
 type TurnstileWidget = {
@@ -129,16 +138,24 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
   const [requiresCaptcha, setRequiresCaptcha] = useState(() => import.meta.env.DEV && new URLSearchParams(window.location.search).get("captchaFallback") === "1");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaVersion, setCaptchaVersion] = useState(0);
-  const [confirmation, setConfirmation] = useState<{ queueNumber: number; assignedTime: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationDetails | null>(null);
   const captchaPanelRef = useRef<HTMLDivElement>(null);
   const fallbackQaHasRunRef = useRef(false);
   const createRequest = trpc.appointments.create.useMutation({
     onSuccess: result => {
+      const submittedForm = form;
       setForm(initialForm);
       setPreferredTimeInput("09:00");
       setPreferredPeriod("AM");
       if (result.queueNumber !== undefined && result.assignedTime !== undefined) {
-        setConfirmation({ queueNumber: result.queueNumber, assignedTime: result.assignedTime });
+        setConfirmation({
+          queueNumber: result.queueNumber,
+          assignedTime: result.assignedTime,
+          preferredDate: submittedForm.preferredDate,
+          fullName: submittedForm.fullName,
+          contactNumber: submittedForm.contactNumber,
+          service: submittedForm.service,
+        });
       }
       setRequiresCaptcha(false);
       setCaptchaToken("");
@@ -164,6 +181,43 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
   });
 
   const handleCaptchaToken = useCallback((token: string) => setCaptchaToken(token), []);
+
+  const saveConfirmationImage = () => {
+    if (!confirmation) return;
+    const lines = [
+      "KLINIK BERKAT INSANI",
+      "Ringkasan pengajuan kunjungan",
+      `Nomor antrian: ${confirmation.queueNumber}`,
+      `Tanggal pilihan: ${confirmation.preferredDate}`,
+      `Nama lengkap: ${confirmation.fullName}`,
+      `Nomor WhatsApp: ${confirmation.contactNumber}`,
+      `Layanan poli: ${confirmation.service}`,
+      `Jam layanan: ${confirmation.assignedTime}`,
+    ];
+    const escaped = lines.map(line => line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"));
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620"><rect width="900" height="620" rx="32" fill="#eef8f8"/><rect x="32" y="32" width="836" height="556" rx="24" fill="#ffffff"/><rect x="32" y="32" width="836" height="112" rx="24" fill="#173047"/><text x="72" y="82" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="700">${escaped[0]}</text><text x="72" y="118" fill="#bfeaf0" font-family="Arial, sans-serif" font-size="18">${escaped[1]}</text>${escaped.slice(2).map((line, index) => `<text x="80" y="${210 + index * 52}" fill="#173047" font-family="Arial, sans-serif" font-size="23"${index === 0 ? " font-weight=\"700\"" : ""}>${line}</text>`).join("")}<text x="80" y="555" fill="#607684" font-family="Arial, sans-serif" font-size="16">Harap tunggu konfirmasi dari staf klinik.</text></svg>`;
+    const link = document.createElement("a");
+    link.href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    link.download = `ringkasan-kunjungan-${confirmation.queueNumber}.svg`;
+    link.click();
+    toast.success("Ringkasan berhasil disimpan sebagai gambar.");
+  };
+
+  const sendConfirmationToWhatsApp = () => {
+    if (!confirmation) return;
+    const message = [
+      "Halo Klinik Berkat Insani, saya ingin mengirim ringkasan pengajuan kunjungan:",
+      `Nomor antrian: ${confirmation.queueNumber}`,
+      `Tanggal pilihan: ${confirmation.preferredDate}`,
+      `Nama lengkap: ${confirmation.fullName}`,
+      `Nomor WhatsApp: ${confirmation.contactNumber}`,
+      `Layanan poli: ${confirmation.service}`,
+      `Jam layanan: ${confirmation.assignedTime}`,
+      "Mohon bantu konfirmasi ketersediaannya. Terima kasih.",
+    ].join("\n");
+    const separator = whatsappUrl.includes("?") ? "&" : "?";
+    window.open(`${whatsappUrl}${separator}text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  };
 
   useEffect(() => {
     if (!open || !isDevelopmentFallbackQa || fallbackQaHasRunRef.current) return;
@@ -233,13 +287,28 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
         <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-8">
           {confirmation ? <div className="rounded-2xl border border-[#039CB7]/25 bg-[#eef8f8] p-5" role="status">
             <p className="text-sm font-bold uppercase tracking-[.12em] text-[#007f98]">Permintaan diterima</p>
-            <h3 className="mt-2 font-display text-2xl font-semibold text-[#173047]">Nomor antrian Anda: {confirmation.queueNumber}</h3>
-            <p className="mt-2 text-sm leading-6 text-[#395568]">Jam layanan yang dialokasikan sistem: <strong>{confirmation.assignedTime}</strong>. Staf klinik akan menghubungi Anda untuk mengonfirmasi ketersediaan.</p>
-            <button type="button" onClick={() => { setConfirmation(null); onOpenChange(false); }} className="mt-5 inline-flex rounded-full bg-[#039CB7] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#007f98]">Selesai</button>
+            <div id="appointment-confirmation-object" className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+              <h3 className="font-display text-2xl font-semibold text-[#173047]">Ringkasan pengajuan kunjungan</h3>
+              <dl className="mt-4 grid gap-3 text-sm text-[#395568]">
+                <div className="flex items-start justify-between gap-4 border-b border-[#173047]/10 pb-3"><dt>Nomor antrian</dt><dd className="font-bold text-[#007f98]">{confirmation.queueNumber}</dd></div>
+                <div className="flex items-start justify-between gap-4 border-b border-[#173047]/10 pb-3"><dt>Tanggal pilihan</dt><dd className="text-right font-semibold">{new Date(`${confirmation.preferredDate}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</dd></div>
+                <div className="flex items-start justify-between gap-4 border-b border-[#173047]/10 pb-3"><dt>Nama lengkap</dt><dd className="text-right font-semibold">{confirmation.fullName}</dd></div>
+                <div className="flex items-start justify-between gap-4 border-b border-[#173047]/10 pb-3"><dt>Nomor WhatsApp</dt><dd className="text-right font-semibold">{confirmation.contactNumber}</dd></div>
+                <div className="flex items-start justify-between gap-4 border-b border-[#173047]/10 pb-3"><dt>Layanan poli</dt><dd className="text-right font-semibold">{confirmation.service}</dd></div>
+                <div className="flex items-start justify-between gap-4"><dt>Jam layanan</dt><dd className="text-right font-bold text-[#007f98]">{confirmation.assignedTime}</dd></div>
+              </dl>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#395568]">Staf klinik akan menghubungi Anda untuk mengonfirmasi ketersediaan.</p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <button type="button" onClick={saveConfirmationImage} className="inline-flex items-center justify-center gap-2 rounded-full border border-[#039CB7]/30 bg-white px-4 py-3 text-sm font-bold text-[#007f98] transition hover:bg-[#eaf9fb]"><Download size={16} /> Simpan gambar</button>
+              <button type="button" onClick={sendConfirmationToWhatsApp} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1da851]"><Send size={16} /> Kirim ke WhatsApp staf</button>
+              <button type="button" onClick={() => { setConfirmation(null); onOpenChange(false); }} className="inline-flex items-center justify-center rounded-full bg-[#039CB7] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#007f98]">Selesai</button>
+            </div>
           </div> : <div className="grid gap-5 sm:grid-cols-2">
             <div className="grid gap-2 rounded-xl border border-dashed border-[#039CB7]/40 bg-[#f5fafb] px-4 py-3 text-sm text-[#395568] sm:col-span-2">
               <span className="font-bold">Nomor antrian</span>
-              <span className="text-xs leading-5 text-[#607684]">Diisi otomatis oleh sistem setelah permintaan berhasil dikirim.</span>
+              <span className="text-2xl font-semibold text-[#007f98]" aria-label="Nomor antrian sementara">—</span>
+              <span className="text-xs leading-5 text-[#607684]">Nomor antrean ditampilkan langsung di bagian ini dan ditetapkan saat permintaan diproses.</span>
             </div>
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Nama lengkap
               <input required value={form.fullName} onChange={e => setForm(current => ({ ...current, fullName: e.target.value }))} autoComplete="name" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />

@@ -1,0 +1,3 @@
+# Confirmation sharing visual verification
+
+The public appointment entry point was checked at 1280px desktop and 375px mobile widths after adding the complete confirmation object. The existing public header, hero, and appointment entry controls remain visible and responsive. The confirmation implementation contains the requested fields: Nomor antrian, Tanggal pilihan, Nama lengkap, Nomor WhatsApp, Layanan poli, and Jam layanan. The image action downloads a privacy-safe SVG image generated from those fields, while the WhatsApp action opens the configured clinic staff number with the same summary and excludes the optional appointment note.

@@ -315,3 +315,10 @@
 - [x] Add the supplied doctors, service days, hours, and by-appointment notes to the persisted clinic service content.
 - [x] Update appointment service choices and explanatory UI to use the refreshed service information.
 - [x] Add unit tests for service-hour validation and run full verification before checkpoint.
+
+## Appointment confirmation summary and sharing
+
+- [x] Show Tanggal pilihan, Nama lengkap, Nomor WhatsApp, and Layanan Poli alongside Jam layanan and Nomor antrian in the confirmation object.
+- [x] Add an accessible Save Image action for the confirmation object.
+- [x] Add a WhatsApp button that opens the clinic staff/admin number with the confirmation summary.
+- [x] Add tests and responsive verification, then save the updated checkpoint.
