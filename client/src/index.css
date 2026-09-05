@@ -71,6 +71,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgba(3,156,183,.34); 
 .nav-link:hover::after { width: 100%; }
 
 @keyframes fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes osd-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

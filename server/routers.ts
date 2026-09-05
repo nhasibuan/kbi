@@ -9,6 +9,7 @@ import {
   getAdminClinicContent,
   getAppointmentRequests,
   getPublicClinicContent,
+  getPublicOsdSnapshot,
   getWhatsAppFollowUpActivities,
   saveClinicProfile,
   saveService,
@@ -126,6 +127,9 @@ export const appRouter = router({
     updateSignatureTemplate: adminProcedure
       .input(z.object({ content: z.string().trim().min(2).max(1000) }))
       .mutation(({ ctx, input }) => saveWhatsAppSignatureTemplate(input.content, ctx.user.id)),
+  }),
+  osd: router({
+    snapshot: publicProcedure.query(() => getPublicOsdSnapshot()),
   }),
   clinic: router({
     publicContent: publicProcedure.query(() => getPublicClinicContent()),

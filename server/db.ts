@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, ne, sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   appointmentRequests,
@@ -12,6 +12,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { allocateAppointmentTime } from "./appointmentRequest";
+import { OSD_DOCTORS } from "../shared/osd";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -208,6 +209,37 @@ export async function createAppointmentRequest(input: AppointmentRequestInput) {
 export async function getAppointmentRequests() {
   const db = requireDb(await getDb());
   return db.select().from(appointmentRequests).orderBy(desc(appointmentRequests.createdAt));
+}
+
+export function getWitaDateString(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Makassar", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+type OsdQueueRow = {
+  queueNumber: number;
+  fullName: string;
+  service: string;
+  assignedTime: string;
+  status: "new" | "contacted" | "closed";
+};
+
+export function buildOsdSnapshot(rows: OsdQueueRow[], today: string, lastUpdated = new Date().toISOString()) {
+  const displayRows = rows.filter(row => row.status !== "closed").map(row => ({ ...row, doctor: OSD_DOCTORS[row.service] ?? "Staf medis klinik" }));
+  const waiting = displayRows.filter(row => row.status === "new");
+  const inTreatment = displayRows.filter(row => row.status === "contacted");
+  return { today, active: waiting[0] ?? inTreatment[0] ?? null, waiting, inTreatment, lastUpdated };
+}
+
+export async function getPublicOsdSnapshot() {
+  const db = await getDb();
+  const today = getWitaDateString();
+  if (!db) return buildOsdSnapshot([], today);
+  const rows = await db
+    .select({ queueNumber: appointmentRequests.queueNumber, fullName: appointmentRequests.fullName, service: appointmentRequests.service, assignedTime: appointmentRequests.assignedTime, status: appointmentRequests.status })
+    .from(appointmentRequests)
+    .where(and(eq(appointmentRequests.preferredDate, today), ne(appointmentRequests.status, "closed")))
+    .orderBy(asc(appointmentRequests.queueNumber));
+  return buildOsdSnapshot(rows, today);
 }
 
 export async function updateAppointmentRequestStatus(id: number, status: "new" | "contacted" | "closed") {

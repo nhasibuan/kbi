@@ -328,3 +328,11 @@
 - [x] Make the `Selesai` button save the confirmation image and open WhatsApp staff with the summary.
 - [x] Delete the separate `Kirim ke WhatsApp staf` button.
 - [x] Verify the consolidated action, run tests/build, and save the updated checkpoint.
+
+## OSD antrean klinik
+
+- [x] Inspect appointment status fields, doctor/poli content, existing routes, and admin queue controls.
+- [x] Add a public queue snapshot procedure with privacy-safe fields and near-real-time refresh.
+- [x] Build `/osd` with active queue number, waiting/in-treatment patients, poli and doctor, running text, and YouTube education media.
+- [x] Add unit tests for queue snapshot shaping and verify loading, empty, refresh, and error states.
+- [x] Verify the OSD route at desktop and wide-screen sizes, then save a checkpoint.
