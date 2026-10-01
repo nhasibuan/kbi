@@ -4,12 +4,14 @@ import { TRPCError } from "@trpc/server";
 import { normalizeAssetFileName, decodeMediaUpload } from "./clinicContent";
 import {
   createAppointmentRequest,
+  callNextAppointment,
   createMediaAsset,
   createWhatsAppFollowUpActivity,
   getAdminClinicContent,
   getAppointmentRequests,
   getPublicClinicContent,
   getPublicOsdSnapshot,
+  getQueuePreview,
   getWhatsAppFollowUpActivities,
   saveClinicProfile,
   saveService,
@@ -19,8 +21,11 @@ import {
 import {
   appointmentSubmissionRateLimiter,
   getClientIp,
+  isValidIsoDate,
+  isValidNik,
   isAutomatedAppointmentRequest,
   normalizeAppointmentNote,
+  validatePreferredServiceTime,
 } from "./appointmentRequest";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -48,14 +53,27 @@ const serviceInput = z.object({
 
 const appointmentInput = z.object({
   fullName: z.string().trim().min(2).max(160),
+  nik: z.string().refine(isValidNik, "NIK harus terdiri dari 16 digit."),
+  birthPlace: z.string().trim().min(2).max(120),
+  birthDate: z.string().refine(isValidIsoDate, "Gunakan tanggal lahir yang valid."),
+  address: z.string().trim().min(8).max(2000),
+  religion: z.string().trim().min(2).max(40),
   contactNumber: z.string().trim().min(8).max(40).regex(/^[0-9+()\-\s]+$/, "Use a valid phone or WhatsApp number."),
   service: z.string().trim().min(2).max(160),
-  preferredDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid preferred date."),
+  preferredDate: z.string().refine(isValidIsoDate, "Use a valid preferred date."),
   preferredTime: z.string().regex(/^(0[1-9]|1[0-2]):[0-5][0-9] (AM|PM)$/, "Gunakan format jam XX:YY AM|PM."),
   note: z.string().trim().max(600).optional(),
+  complaint: z.string().trim().min(2).max(600),
   consent: z.literal(true),
   website: z.string().max(255).optional(),
   captchaToken: z.string().trim().max(2048).optional(),
+}).superRefine((input, context) => {
+  try {
+    const schedule = validatePreferredServiceTime(input.service, input.preferredDate, input.preferredTime);
+    if (!schedule.valid) context.addIssue({ code: "custom", message: schedule.message, path: ["preferredTime"] });
+  } catch (error) {
+    context.addIssue({ code: "custom", message: error instanceof Error ? error.message : "Gunakan waktu layanan yang valid.", path: ["preferredTime"] });
+  }
 });
 
 const followUpActivityFilterInput = z.object({
@@ -104,15 +122,27 @@ export const appRouter = router({
       }
       const request = await createAppointmentRequest({
         fullName: input.fullName,
+        nik: input.nik,
+        birthPlace: input.birthPlace,
+        birthDate: input.birthDate,
+        address: input.address,
+        religion: input.religion,
         contactNumber: input.contactNumber,
         service: input.service,
         preferredDate: input.preferredDate,
         preferredTime: input.preferredTime,
-        note: normalizeAppointmentNote(input.note),
+        note: null,
+        complaint: normalizeAppointmentNote(input.complaint),
       });
       return { success: true, requestId: request.id, queueNumber: request.queueNumber, assignedTime: request.assignedTime } as const;
     }),
+    queuePreview: publicProcedure
+      .input(z.object({ preferredDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+      .query(({ input }) => getQueuePreview(input.preferredDate)),
     list: adminProcedure.query(() => getAppointmentRequests()),
+    callNext: adminProcedure
+      .input(z.object({ preferredDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+      .mutation(({ input }) => callNextAppointment(input.preferredDate)),
     updateStatus: adminProcedure
       .input(z.object({ id: z.number().int().positive(), status: z.enum(["new", "contacted", "closed"]) }))
       .mutation(({ input }) => updateAppointmentRequestStatus(input.id, input.status)),

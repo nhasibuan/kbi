@@ -5,6 +5,8 @@ import {
   formatPreferredTime,
   getServiceHourWindow,
   getClientIp,
+  isValidIsoDate,
+  isValidNik,
   parsePreferredTime,
   validatePreferredServiceTime,
   isAutomatedAppointmentRequest,
@@ -46,6 +48,13 @@ describe("appointment request privacy helpers", () => {
   it("detects a completed spam honeypot", () => {
     expect(isAutomatedAppointmentRequest("")).toBe(false);
     expect(isAutomatedAppointmentRequest("https://spam.example")).toBe(true);
+  });
+
+  it("validates protected identity primitives without accepting impossible dates", () => {
+    expect(isValidNik("3201010101010001")).toBe(true);
+    expect(isValidNik("320101010101001")).toBe(false);
+    expect(isValidIsoDate("1990-02-28")).toBe(true);
+    expect(isValidIsoDate("1990-02-30")).toBe(false);
   });
 
   it("allows normal submissions while rejecting rapid repeats from the same IP", () => {

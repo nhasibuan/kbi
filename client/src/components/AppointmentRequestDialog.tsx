@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { CalendarDays, MessageCircle, ShieldCheck } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type AppointmentRequestDialogProps = {
@@ -19,11 +19,16 @@ type AppointmentRequestDialogProps = {
 
 const initialForm = {
   fullName: "",
+  nik: "",
+  birthPlace: "",
+  birthDate: "",
+  address: "",
+  religion: "",
   contactNumber: "",
   service: "",
   preferredDate: "",
   preferredTime: "09:00 AM",
-  note: "",
+  complaint: "",
   consent: false,
   website: "",
 };
@@ -141,6 +146,10 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
   const [confirmation, setConfirmation] = useState<ConfirmationDetails | null>(null);
   const captchaPanelRef = useRef<HTMLDivElement>(null);
   const fallbackQaHasRunRef = useRef(false);
+  const previewInput = useMemo(() => ({ preferredDate: form.preferredDate }), [form.preferredDate]);
+  const { data: queuePreview, isLoading: queuePreviewLoading, isError: queuePreviewError } = trpc.appointments.queuePreview.useQuery(previewInput, {
+    enabled: open && Boolean(form.preferredDate),
+  });
   const createRequest = trpc.appointments.create.useMutation({
     onSuccess: result => {
       const submittedForm = form;
@@ -231,12 +240,17 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
     fallbackQaHasRunRef.current = true;
     const qaRequest = {
       fullName: "QA CAPTCHA Browser Fallback",
+      nik: "3201010101010001",
+      birthPlace: "Kotabaru",
+      birthDate: "1990-01-01",
+      address: "Jl. Uji Coba No. 1, Kotabaru",
+      religion: "Islam",
       contactNumber: "+6285215862526",
       service: "Poli Umum",
       preferredDate: "2026-08-26",
       preferredTime: "09:00 AM",
       consent: true as const,
-      note: "",
+      complaint: "Keluhan untuk pengujian",
       website: "",
     };
     setForm(qaRequest);
@@ -312,11 +326,29 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
           </div> : <div className="grid gap-5 sm:grid-cols-2">
             <div className="grid gap-2 rounded-xl border border-dashed border-[#039CB7]/40 bg-[#f5fafb] px-4 py-3 text-sm text-[#395568] sm:col-span-2">
               <span className="font-bold">Nomor antrian</span>
-              <span className="text-2xl font-semibold text-[#007f98]" aria-label="Nomor antrian sementara">—</span>
-              <span className="text-xs leading-5 text-[#607684]">Nomor antrean ditampilkan langsung di bagian ini dan ditetapkan saat permintaan diproses.</span>
+              <span className="text-2xl font-semibold text-[#007f98]" aria-label="Nomor antrian sementara">{queuePreviewLoading ? "…" : queuePreviewError ? "—" : queuePreview ?? "—"}</span>
+              <span className="text-xs leading-5 text-[#607684]">Nomor antrean sementara untuk tanggal pilihan. Nomor ini belum dipesan dan dapat berubah jika ada pengajuan lebih dulu.</span>
             </div>
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Nama lengkap
               <input required value={form.fullName} onChange={e => setForm(current => ({ ...current, fullName: e.target.value }))} autoComplete="name" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-[#395568]">NIK
+              <input required type="text" inputMode="numeric" pattern="[0-9]{16}" maxLength={16} value={form.nik} onChange={e => setForm(current => ({ ...current, nik: e.target.value.replace(/\D/g, "").slice(0, 16) }))} autoComplete="off" aria-describedby="nik-help" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+              <span id="nik-help" className="text-xs font-normal text-[#607684]">16 digit angka. Data ini hanya terlihat oleh administrator.</span>
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-[#395568]">Tempat lahir
+              <input required value={form.birthPlace} onChange={e => setForm(current => ({ ...current, birthPlace: e.target.value }))} autoComplete="address-level2" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-[#395568]">Tanggal lahir
+              <input required type="date" value={form.birthDate} onChange={e => setForm(current => ({ ...current, birthDate: e.target.value }))} autoComplete="bday" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-[#395568]">Agama
+              <select required value={form.religion} onChange={e => setForm(current => ({ ...current, religion: e.target.value }))} className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10">
+                <option value="" disabled>Pilih agama</option><option value="Islam">Islam</option><option value="Kristen Protestan">Kristen Protestan</option><option value="Katolik">Katolik</option><option value="Hindu">Hindu</option><option value="Buddha">Buddha</option><option value="Konghucu">Konghucu</option><option value="Lainnya">Lainnya</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-[#395568] sm:col-span-2">Alamat lengkap
+              <textarea required value={form.address} onChange={e => setForm(current => ({ ...current, address: e.target.value }))} autoComplete="street-address" rows={3} className="resize-none rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm leading-6 text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
             </label>
             <label className="grid gap-2 text-sm font-bold text-[#395568]">Nomor WhatsApp / telepon
               <input required type="tel" value={form.contactNumber} onChange={e => setForm(current => ({ ...current, contactNumber: e.target.value }))} autoComplete="tel" className="rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
@@ -340,8 +372,9 @@ export default function AppointmentRequestDialog({ open, onOpenChange, services,
             </label>
           </div>}
 
-          {!confirmation && <label className="grid gap-2 text-sm font-bold text-[#395568]">Catatan untuk penjadwalan <span className="font-normal text-[#607684]">(opsional)</span>
-            <textarea value={form.note} onChange={e => setForm(current => ({ ...current, note: e.target.value }))} maxLength={600} rows={3} placeholder="Contoh: lebih mudah dihubungi pada sore hari. Jangan sertakan diagnosis atau hasil pemeriksaan." className="resize-none rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm leading-6 text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+          {!confirmation && <label className="grid gap-2 text-sm font-bold text-[#395568]">Keluhan
+            <textarea required value={form.complaint} onChange={e => setForm(current => ({ ...current, complaint: e.target.value }))} maxLength={600} rows={3} placeholder="Ceritakan keluhan anda." aria-describedby="complaint-help" className="resize-none rounded-xl border border-[#173047]/15 bg-white px-4 py-3 text-sm leading-6 text-[#173047] outline-none transition focus:border-[#039CB7] focus:ring-4 focus:ring-[#039CB7]/10" />
+            <span id="complaint-help" className="text-xs font-normal leading-5 text-[#607684]">Keluhan ini hanya untuk membantu staf menindaklanjuti pengajuan dan tidak digunakan untuk diagnosis otomatis.</span>
           </label>}
 
           {!confirmation && <div className="absolute left-[-10000px] h-px w-px overflow-hidden" aria-hidden="true">

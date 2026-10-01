@@ -35,11 +35,17 @@ export type ServiceInput = {
 
 export type AppointmentRequestInput = {
   fullName: string;
+  nik: string;
+  birthPlace: string;
+  birthDate: string;
+  address: string;
+  religion: string;
   contactNumber: string;
   service: string;
   preferredDate: string;
   preferredTime: string;
   note?: string | null;
+  complaint?: string | null;
 };
 
 export type WhatsAppFollowUpActivityInput = {
@@ -206,6 +212,39 @@ export async function createAppointmentRequest(input: AppointmentRequestInput) {
   });
 }
 
+export async function getQueuePreview(preferredDate: string) {
+  const db = requireDb(await getDb());
+  const [result] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(appointmentRequests)
+    .where(eq(appointmentRequests.preferredDate, preferredDate));
+  return Number(result?.count ?? 0) + 1;
+}
+
+export async function callNextAppointment(preferredDate: string) {
+  const db = requireDb(await getDb());
+  const lockName = `kbi-call-next-${preferredDate}`;
+  return db.transaction(async tx => {
+    const lockResult = await tx.execute(sql`SELECT GET_LOCK(${lockName}, 10) AS acquired`);
+    const acquired = Number((lockResult as any)[0]?.acquired ?? (lockResult as any)[0]?.[0]?.acquired ?? 0);
+    if (acquired !== 1) throw new Error("Sistem antrean sedang sibuk. Silakan coba lagi.");
+    try {
+      const candidates = await tx
+        .select()
+        .from(appointmentRequests)
+        .where(and(eq(appointmentRequests.preferredDate, preferredDate), eq(appointmentRequests.status, "new")))
+        .orderBy(asc(appointmentRequests.queueNumber))
+        .limit(1);
+      const next = selectNextWaitingRequest(candidates);
+      if (!next) return null;
+      await tx.update(appointmentRequests).set({ status: "contacted" }).where(eq(appointmentRequests.id, next.id));
+      return { ...next, status: "contacted" as const };
+    } finally {
+      await tx.execute(sql`SELECT RELEASE_LOCK(${lockName})`);
+    }
+  });
+}
+
 export async function getAppointmentRequests() {
   const db = requireDb(await getDb());
   return db.select().from(appointmentRequests).orderBy(desc(appointmentRequests.createdAt));
@@ -222,6 +261,10 @@ type OsdQueueRow = {
   assignedTime: string;
   status: "new" | "contacted" | "closed";
 };
+
+export function selectNextWaitingRequest<T extends { queueNumber: number; status: "new" | "contacted" | "closed" }>(rows: T[]) {
+  return rows.filter(row => row.status === "new").sort((a, b) => a.queueNumber - b.queueNumber)[0] ?? null;
+}
 
 export function buildOsdSnapshot(rows: OsdQueueRow[], today: string, lastUpdated = new Date().toISOString()) {
   const displayRows = rows.filter(row => row.status !== "closed").map(row => ({ ...row, doctor: OSD_DOCTORS[row.service] ?? "Staf medis klinik" }));

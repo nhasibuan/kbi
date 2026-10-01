@@ -129,8 +129,16 @@ export default function ClinicAdmin() {
 
   const updateAppointmentStatus = trpc.appointments.updateStatus.useMutation({
     onSuccess: async () => {
-      await utils.appointments.list.invalidate();
+      await Promise.all([utils.appointments.list.invalidate(), utils.osd.snapshot.invalidate()]);
       toast.success("Status permintaan diperbarui.");
+    },
+    onError: error => toast.error(error.message),
+  });
+
+  const callNext = trpc.appointments.callNext.useMutation({
+    onSuccess: async request => {
+      await Promise.all([utils.appointments.list.invalidate(), utils.osd.snapshot.invalidate()]);
+      toast.success(request ? `Nomor antrean ${request.queueNumber} dipanggil.` : "Tidak ada antrean menunggu untuk hari ini.");
     },
     onError: error => toast.error(error.message),
   });
@@ -166,6 +174,9 @@ export default function ClinicAdmin() {
     setActivityStartDate("");
     setActivityEndDate("");
   };
+
+  const todayWita = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Makassar", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const updateRequestStatus = (id: number, status: "new" | "contacted" | "closed") => updateAppointmentStatus.mutate({ id, status });
 
   const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -248,14 +259,14 @@ export default function ClinicAdmin() {
             <section className="rounded-[28px] border border-[#173047]/10 bg-white p-6 shadow-[0_12px_30px_rgba(23,48,71,.05)] sm:p-8">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div><p className="eyebrow">Permintaan kunjungan</p><h2 className="mt-3 font-display text-3xl font-semibold tracking-[-.035em]">Antrean yang perlu ditindaklanjuti</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[#607684]">Data ini hanya untuk menghubungi pemohon terkait jadwal. Jangan menambahkan catatan klinis atau data medis di luar proses yang disetujui.</p></div>
-                <span className="rounded-full bg-[#eef8f8] px-3 py-1.5 text-xs font-bold text-[#007f98]">{appointmentRequests?.length ?? 0} tersimpan</span>
+                <div className="flex flex-wrap items-center gap-3"><span className="rounded-full bg-[#eef8f8] px-3 py-1.5 text-xs font-bold text-[#007f98]">{appointmentRequests?.length ?? 0} tersimpan</span><button type="button" onClick={() => callNext.mutate({ preferredDate: todayWita })} disabled={callNext.isPending} className="inline-flex items-center gap-2 rounded-full bg-[#173047] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#244861] disabled:cursor-not-allowed disabled:opacity-60"><MessageCircle size={16} /> {callNext.isPending ? "Memanggil..." : "Panggil nomor berikutnya"}</button></div>
               </div>
               <div className="mt-7 grid gap-4">
                 {appointmentRequestsLoading ? <div className="grid min-h-28 place-items-center rounded-2xl bg-[#f5fafb]"><Loader2 className="animate-spin text-[#039CB7]" /></div> : appointmentRequests?.length ? appointmentRequests.map(request => (
                   <article key={request.id} className="rounded-2xl border border-[#173047]/10 bg-[#fbfaf5] p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="font-display text-xl font-semibold">{request.fullName}</p><p className="mt-1 text-sm text-[#607684]">{request.service} · Pilihan tanggal: {new Date(`${request.preferredDate}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-bold"><span className="rounded-full bg-[#173047] px-3 py-1 text-white">Nomor antrian: {request.queueNumber}</span><span className="rounded-full bg-[#eaf9fb] px-3 py-1 text-[#007f98]">Jam pilihan: {request.preferredTime}</span><span className="rounded-full bg-[#dff7ed] px-3 py-1 text-emerald-800">Jam layanan: {request.assignedTime}</span></div></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${request.status === "new" ? "bg-amber-100 text-amber-800" : request.status === "contacted" ? "bg-[#eaf9fb] text-[#007f98]" : "bg-slate-100 text-slate-600"}`}>{request.status === "new" ? "Baru" : request.status === "contacted" ? "Dihubungi" : "Selesai"}</span></div>
-                    {request.note ? <p className="mt-4 rounded-xl bg-white p-3 text-sm leading-6 text-[#395568]">{request.note}</p> : null}
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><button onClick={() => setFollowUpRequest({ id: request.id, fullName: request.fullName, contactNumber: request.contactNumber, service: request.service, preferredDate: request.preferredDate })} className="inline-flex items-center gap-2 rounded-full bg-[#eaf9fb] px-4 py-2 text-sm font-bold text-[#007f98] transition hover:bg-[#d7f4f7]"><MessageCircle size={16} /> Draf WhatsApp</button><label className="flex items-center gap-2 text-sm font-bold text-[#395568]">Status<select value={request.status} disabled={updateAppointmentStatus.isPending} onChange={event => updateAppointmentStatus.mutate({ id: request.id, status: event.target.value as "new" | "contacted" | "closed" })} className="rounded-lg border border-[#173047]/15 bg-white px-2 py-1.5 text-sm font-medium outline-none focus:border-[#039CB7]"><option value="new">Baru</option><option value="contacted">Dihubungi</option><option value="closed">Selesai</option></select></label></div>
+                    <div className="mt-4 grid gap-3 rounded-xl border border-[#173047]/10 bg-white p-4 text-sm text-[#395568] sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-[.12em] text-[#607684]">Identitas administratif</p><dl className="mt-3 grid gap-2"><div className="flex justify-between gap-3"><dt>NIK</dt><dd className="text-right font-semibold">{request.nik ?? "Belum tersedia"}</dd></div><div className="flex justify-between gap-3"><dt>Tempat, tanggal lahir</dt><dd className="text-right font-semibold">{request.birthPlace ?? "Belum tersedia"}{request.birthDate ? `, ${request.birthDate}` : ""}</dd></div><div className="flex justify-between gap-3"><dt>Agama</dt><dd className="text-right font-semibold">{request.religion ?? "Belum tersedia"}</dd></div></dl></div><div><p className="text-xs font-bold uppercase tracking-[.12em] text-[#607684]">Data tindak lanjut</p><dl className="mt-3 grid gap-2"><div><dt>Alamat lengkap</dt><dd className="mt-1 font-semibold">{request.address ?? "Belum tersedia"}</dd></div><div><dt>Keluhan</dt><dd className="mt-1 font-semibold">{request.complaint ?? request.note ?? "Belum tersedia"}</dd></div></dl></div></div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2"><button onClick={() => setFollowUpRequest({ id: request.id, fullName: request.fullName, contactNumber: request.contactNumber, service: request.service, preferredDate: request.preferredDate })} className="inline-flex items-center gap-2 rounded-full bg-[#eaf9fb] px-4 py-2 text-sm font-bold text-[#007f98] transition hover:bg-[#d7f4f7]"><MessageCircle size={16} /> Draf WhatsApp</button>{request.status === "contacted" ? <button type="button" onClick={() => updateRequestStatus(request.id, "new")} disabled={updateAppointmentStatus.isPending} className="rounded-full border border-[#173047]/15 px-4 py-2 text-sm font-bold text-[#395568] transition hover:border-[#039CB7] hover:text-[#007f98] disabled:opacity-60">Kembalikan ke menunggu</button> : null}{request.status !== "closed" ? <button type="button" onClick={() => updateRequestStatus(request.id, "closed")} disabled={updateAppointmentStatus.isPending} className="rounded-full border border-emerald-200 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-60">Tandai selesai</button> : null}</div><label className="flex items-center gap-2 text-sm font-bold text-[#395568]">Status<select value={request.status} disabled={updateAppointmentStatus.isPending} onChange={event => updateRequestStatus(request.id, event.target.value as "new" | "contacted" | "closed")} className="rounded-lg border border-[#173047]/15 bg-white px-2 py-1.5 text-sm font-medium outline-none focus:border-[#039CB7]"><option value="new">Menunggu</option><option value="contacted">Sedang ditangani</option><option value="closed">Selesai</option></select></label></div>
                   </article>
                 )) : <div className="rounded-2xl bg-[#f5fafb] p-6 text-sm leading-6 text-[#607684]"><CheckCircle2 className="mr-2 inline-block h-4 w-4 text-[#039CB7]" />Belum ada permintaan kunjungan yang tersimpan.</div>}
               </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOsdSnapshot, getWitaDateString } from "./db";
+import { buildOsdSnapshot, getWitaDateString, selectNextWaitingRequest } from "./db";
 
 describe("OSD queue snapshot", () => {
   it("selects the lowest waiting queue as active and maps the doctor", () => {
@@ -34,5 +34,21 @@ describe("OSD queue snapshot", () => {
 
   it("formats the current date in WITA", () => {
     expect(getWitaDateString(new Date("2026-09-04T16:30:00.000Z"))).toBe("2026-09-05");
+  });
+
+  it("selects the lowest waiting queue for the protected call-next operation", () => {
+    expect(selectNextWaitingRequest([
+      { queueNumber: 4, status: "new" as const },
+      { queueNumber: 2, status: "contacted" as const },
+      { queueNumber: 3, status: "new" as const },
+    ])?.queueNumber).toBe(3);
+    expect(selectNextWaitingRequest([{ queueNumber: 1, status: "contacted" as const }])).toBeNull();
+  });
+
+  it("never includes sensitive appointment fields in the public-shaped snapshot", () => {
+    const snapshot = buildOsdSnapshot([{ queueNumber: 1, fullName: "Ayu", service: "Poli Umum", assignedTime: "09:00 AM", status: "new" }], "2026-09-05");
+    expect(snapshot).not.toHaveProperty("nik");
+    expect(snapshot.active).not.toHaveProperty("contactNumber");
+    expect(snapshot.active).not.toHaveProperty("complaint");
   });
 });

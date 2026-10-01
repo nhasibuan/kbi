@@ -36,6 +36,20 @@
       "when": 1788309547625,
       "tag": "0004_yellow_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1790855673685,
+      "tag": "0005_chubby_eddie_brock",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1790855941422,
+      "tag": "0006_absent_fixer",
+      "breakpoints": true
     }
   ]
 }

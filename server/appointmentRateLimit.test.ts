@@ -25,11 +25,17 @@ import { appRouter } from "./routers";
 
 const input = {
   fullName: "QA Rate Limit",
+  nik: "3201010101010001",
+  birthPlace: "Kotabaru",
+  birthDate: "1990-01-01",
+  address: "Jl. Uji Coba No. 1, Kotabaru",
+  religion: "Islam",
   contactNumber: "+6285215862526",
   service: "Poli Umum",
   preferredDate: "2026-08-26",
   preferredTime: "09:00 AM",
   consent: true as const,
+  complaint: "Keluhan untuk pengujian",
 };
 
 function createContext(ip: string): TrpcContext {

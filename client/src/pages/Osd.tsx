@@ -46,7 +46,7 @@ export default function Osd() {
 
         <section className="flex min-h-0 flex-col gap-5">
           <div className="relative overflow-hidden rounded-3xl border border-cyan-200/20 bg-gradient-to-br from-[#039CB7] via-[#087f9c] to-[#12344a] p-6 shadow-2xl shadow-cyan-950/30 lg:p-8" aria-live="polite">
-            <div className="flex items-center justify-between gap-4"><p className="text-sm font-black uppercase tracking-[.2em] text-cyan-50">Nomor antrean aktif</p><Clock3 size={23} className="text-cyan-100" /></div>
+            <div className="flex items-center justify-between gap-4"><p className="text-sm font-black uppercase tracking-[.2em] text-cyan-50">{active?.status === "contacted" ? "Sedang ditangani" : "Nomor berikutnya"}</p><Clock3 size={23} className="text-cyan-100" /></div>
             {isLoading ? <Loader2 className="mt-7 animate-spin text-white" size={48} /> : isError ? <p className="mt-7 text-lg font-bold text-white">Data antrean belum dapat dimuat.</p> : active ? <div className="mt-4 flex items-end justify-between gap-5"><div className="min-w-0"><p className="truncate text-2xl font-bold text-white lg:text-3xl">{active.fullName}</p><p className="mt-2 text-base font-semibold text-cyan-100">{active.service}</p><p className="mt-1 text-sm text-cyan-100/80">{active.doctor}</p></div><p className="text-8xl font-black leading-none tracking-[-.08em] text-white lg:text-[10rem]">{active.queueNumber}</p></div> : <div className="mt-7"><p className="text-5xl font-black text-white lg:text-7xl">—</p><p className="mt-3 text-base text-cyan-50">Belum ada antrean aktif.</p></div>}
           </div>
 

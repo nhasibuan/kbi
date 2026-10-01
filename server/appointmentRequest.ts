@@ -3,6 +3,16 @@ export function normalizeAppointmentNote(note?: string | null) {
   return normalized || null;
 }
 
+export function isValidIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return date.toISOString().slice(0, 10) === value;
+}
+
+export function isValidNik(value: string) {
+  return /^\d{16}$/.test(value);
+}
+
 export function isAutomatedAppointmentRequest(honeypot?: string | null) {
   return Boolean(honeypot?.trim());
 }
